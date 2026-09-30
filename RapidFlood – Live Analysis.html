@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RapidFlood – Live Analysis</title>
+<style>
+:root{--bg:#eef1ec;--panel:#fff;--ink:#0e1f2e;--mute:#5b6b78;--line:#cfd7d2;--water:#2f7fb8;--flood:#e4572e;--ok:#2e8b57;--mid:#d9982b;--acc:#0e1f2e;--acct:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0b1620;--panel:#122333;--ink:#e6eef2;--mute:#8fa3b0;--line:#25394a;--water:#5aa9dc;--flood:#ff7a4d;--ok:#4fbf82;--mid:#e8ac47;--acc:#e6eef2;--acct:#0b1620}}
+:root[data-theme=dark]{--bg:#0b1620;--panel:#122333;--ink:#e6eef2;--mute:#8fa3b0;--line:#25394a;--water:#5aa9dc;--flood:#ff7a4d;--ok:#4fbf82;--mid:#e8ac47;--acc:#e6eef2;--acct:#0b1620}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 40px}
+h1{font:600 clamp(26px,5vw,38px)/1.1 "Iowan Old Style",Georgia,serif;margin:0 0 4px;letter-spacing:-.01em}
+h2{font:600 19px Georgia,serif;margin:22px 0 8px}
+.sub{color:var(--mute);margin:0 0 12px;max-width:62ch}
+.demo{border-left:4px solid var(--mid);background:var(--panel);padding:8px 12px;margin:10px 0 16px;font-size:13.5px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.k{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.k b{display:block;font:600 24px Georgia,serif}.k span{font-size:12.5px;color:var(--mute)}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+label{font-size:13px;color:var(--mute);display:block}label b{color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--water)}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin:18px 0 12px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:8px 12px;font:inherit;cursor:pointer}
+nav button[aria-selected=true]{color:var(--ink);border-color:var(--flood);font-weight:600}
+button:focus-visible,input:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.btn{background:var(--acc);color:var(--acct);border:0;border-radius:5px;padding:7px 14px;font:inherit;cursor:pointer}
+canvas{width:100%;image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;background:#000;display:block}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+figcaption{font-size:12.5px;color:var(--mute);margin-top:4px}figure{margin:0}
+.layers{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 8px;font-size:13px}.layers label{color:var(--ink);display:inline-flex;gap:5px;align-items:center}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tag{padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;font-weight:600}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:3px 0 10px}.bar i{display:block;height:100%;background:var(--flood)}
+.zone{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-top:8px;font-size:14px}
+.rec{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px}.rec b{display:block}
+
+.two>div{min-width:0}.live{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--flood);margin-right:6px;animation:p 1s infinite}.off{animation:none;background:var(--mute)}@keyframes p{50%{opacity:.25}}
+#feed{max-height:260px;overflow:auto;font-size:13.5px}#feed div{padding:5px 0;border-bottom:1px solid var(--line)}#feed i{color:var(--mute);font-style:normal;margin-right:8px}
+.prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:8px 0}.prog i{display:block;height:100%;width:0;background:var(--water)}
+</style></head><body><main>
+<h1>RapidFlood <span style="font-weight:400;color:var(--mute)">Live Analysis</span></h1>
+<p class="sub">Sentinel-1 flood detection, impact and decision support. This page runs the full pipeline in your browser on a fixed synthetic scene.</p>
+<div class="demo"><b>Demo data.</b> The satellite scene is synthetic (fixed seed 42), not real imagery. Live Sentinel-1 analysis needs the Streamlit app with Earth Engine. The live run below replays the detected flood pixels strongest-change first; it is not a measured time series.</div>
+<div class="ctl">
+<label>Water threshold <b id="vw"></b> dB<input id="w" type="range" min="-25" max="-12" step=".5" value="-18"></label>
+<label>Change threshold <b id="vc"></b> dB<input id="c" type="range" min="-8" max="-1" step=".5" value="-3"></label>
+<label>Min region size <b id="vm"></b> px<input id="m" type="range" min="1" max="60" step="1" value="12"></label>
+</div>
+<p><button class="btn" id="go">Restart live run</button> <button class="btn" id="pause">Pause</button> <span class="sub" id="st"></span></p>
+<div class="prog"><i id="pb"></i></div>
+<div class="kpis" id="kpis"></div>
+<div class="two"><div><h2>Live flood map</h2><canvas id="map" width="640" height="640" aria-label="Live flood map"></canvas></div>
+<div><h2>Event feed</h2><div id="feed" class="zone"></div><h2>Live trend</h2><canvas id="tl" width="640" height="260" style="background:var(--panel)"></canvas><figcaption id="lg"></figcaption></div></div>
+<h2>Threshold sensitivity</h2>
+<div class="two"><figure><canvas id="s1" width="640" height="240" style="background:var(--panel)"></canvas><figcaption>Flooded area vs water threshold</figcaption></figure><figure><canvas id="s2" width="640" height="240" style="background:var(--panel)"></canvas><figcaption>Flooded area vs change threshold</figcaption></figure></div>
+<h2>Automated findings</h2><div id="recs"></div>
+<h2>Settlements and roads (current)</h2><div class="two"><div class="wrap"><table id="tS"></table></div><div class="wrap"><table id="tR"></table></div></div>
+<p class="sub">Recommendations are derived from satellite results and are not official emergency instructions.</p>
+</main>
+<script>
+const N=160,WK=39.8,HK=38.7,PXA=WK*HK/(N*N),KM=WK/N,$=id=>document.getElementById(id);
+/* ---------- synthetic scene (seed 42) ---------- */
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(42),gs=()=>{let u=0;for(let i=0;i<6;i++)u+=R();return(u-3)/.7071};
+function blur(a,r){const t=new Float32Array(N*N),o=new Float32Array(N*N),d=2*r+1;
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){let s=0;for(let k=-r;k<=r;k++)s+=a[y*N+Math.min(N-1,Math.max(0,x+k))];t[y*N+x]=s/d}
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){let s=0;for(let k=-r;k<=r;k++)s+=t[Math.min(N-1,Math.max(0,y+k))*N+x];o[y*N+x]=s/d}return o}
+function norm(a){let m=0,v=0;a.forEach(x=>m+=x);m/=a.length;a.forEach(x=>v+=(x-m)**2);const s=Math.sqrt(v/a.length)||1;return a.map(x=>(x-m)/s)}
+const noise=()=>Float32Array.from({length:N*N},gs),cx=y=>N*(.5+.12*Math.sin(3*Math.PI*y/N));
+const sm=norm(blur(noise(),7)),tex=norm(blur(noise(),2)),agn=norm(blur(noise(),5));
+const preW=new Uint8Array(N*N),postW=new Uint8Array(N*N),ag=new Uint8Array(N*N),pre0=new Float32Array(N*N),post0=new Float32Array(N*N);
+for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x,dist=Math.abs(x-cx(y)),el=dist/(N/2)+.1*sm[i];
+ const pw=dist<3||(((x-.8*N)/10)**2+((y-.2*N)/6)**2<1);preW[i]=pw;const qw=pw||el<.22;
+ pre0[i]=(pw?-21+.8*tex[i]:-8.5+1.2*tex[i])+gs()*1.6;post0[i]=(qw?-21+.8*tex[i]:-8.5+1.2*tex[i])+gs()*1.6;
+ ag[i]=(dist>6&&el<.9&&agn[i]>-.02)?1:0}
+const PRE=blur(pre0,2),POST=blur(post0,2);
+const SET=[["Dhalpur",.20,-10],["Majgaon",.35,12],["Kharupetia",.50,-20],["Bhogpur",.62,7],["Rangatoli",.78,-15],["Tezghat",.88,27],["Uttar Sila",.12,40],["Hill Haat",.45,50],["Dakshin Pam",.95,-46]].map(([n,fy,dx])=>({n,y:fy*N,x:Math.min(N-3,Math.max(2,cx(fy*N)+dx))}));
+const lin=(f,k=25)=>Array.from({length:k},(_,i)=>f(i/(k-1)*(N-1)));
+const ROADS=[["NH-37 (E-W)",lin(t=>[t,.5*N+4*Math.sin(t/20)])],["SH-1 (east)",lin(t=>[Math.min(N-2,cx(t)+30),t])],["West Bank Rd",lin(t=>[cx(t)-12,t])],["Link Rd (south)",lin(t=>[t,.85*N+3*Math.sin(t/15)])],["Hill Rd",lin(t=>[Math.min(N-2,cx(t)+57),t])],["Ghat Rd",lin(t=>[.15*N+(cx(.4*N)-.15*N)*t/(N-1),.1*N+.3*N*t/(N-1)])]].map(([n,p])=>({n,p}));
+
+function removeSmall(m,minpx){const lab=new Int32Array(N*N),o=new Uint8Array(N*N);let st=[];
+ for(let s=0;s<N*N;s++){if(!m[s]||lab[s])continue;const comp=[s];lab[s]=1;st=[s];
+  while(st.length){const p=st.pop(),x=p%N,y=(p/N)|0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const q=ny*N+nx;if(m[q]&&!lab[q]){lab[q]=1;comp.push(q);st.push(q)}}}
+  if(comp.length>=minpx)comp.forEach(q=>o[q]=1)}return o}
+
+const C=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim(),f1=v=>v.toFixed(1);
+const score=(ff,agf,ns)=>100*(.5*Math.min(ff/.5,1)+.3*agf+.2*Math.min(ns,1)),lvl=s=>s<34?"LOW":s<67?"MEDIUM":"HIGH";
+const COL={LOW:"var(--ok)",MEDIUM:"var(--mid)",HIGH:"var(--flood)"},tag=(t,c)=>`<span class="tag" style="background:${c}">${t}</span>`;
+const DIFF=POST.map((v,i)=>v-PRE[i]);
+function pipe(wt,ct,mp){const pw=removeSmall(PRE.map(v=>v<wt?1:0),mp),qw=removeSmall(POST.map(v=>v<wt?1:0),mp),nw=new Uint8Array(N*N);
+ for(let i=0;i<N*N;i++)nw[i]=qw[i]&&!pw[i]&&DIFF[i]<ct?1:0;return{pw,qw,nw:removeSmall(nw,mp)}}
+function metrics(nw){let f=0,at=0,af=0;for(let i=0;i<N*N;i++){f+=nw[i];if(ag[i]){at++;af+=nw[i]}}
+ const sett=SET.map(s=>{let ff=0,t=0;for(let y=Math.floor(s.y-4);y<=s.y+4;y++)for(let x=Math.floor(s.x-4);x<=s.x+4;x++){if(x<0||y<0||x>=N||y>=N||(x-s.x)**2+(y-s.y)**2>13)continue;t++;ff+=nw[y*N+x]}
+  const e=t?100*ff/t:0;return{...s,e,aff:e>=5}});
+ const roads=ROADS.map(r=>{let L=0,A=0;for(let i=1;i<r.p.length;i++){const a=r.p[i-1],b=r.p[i],len=Math.hypot(b[0]-a[0],b[1]-a[1]);L+=len;
+  const mx=Math.min(N-1,Math.round((a[0]+b[0])/2)),my=Math.min(N-1,Math.round((a[1]+b[1])/2));if(nw[my*N+mx])A+=len}
+  const pc=100*A/L;return{n:r.n,len:L*KM,aff:A*KM,pc,st:pc<1?"SAFE":pc<40?"PARTIALLY AFFECTED":"FLOOD-AFFECTED"}});
+ const rk=roads.reduce((s,r)=>s+r.len,0),ra=roads.reduce((s,r)=>s+r.aff,0),sa=sett.filter(s=>s.aff).length,area=f*PXA;
+ const sc=(Math.min(area/(WK*HK)*100/30,1)*100+100*sa/sett.length+Math.min(100*ra/rk/50,1)*100+Math.min(100*(af/Math.max(at,1))/50,1)*100)/4;
+ return{area,sett,roads,rk,ra,sa,agT:at*PXA,agF:af*PXA,agP:100*af/Math.max(at,1),sc,lv:lvl(sc)}}
+/* ---------- drawing ---------- */
+const cv=fn=>{const c=document.createElement("canvas");c.width=c.height=N;const x=c.getContext("2d"),im=x.createImageData(N,N);for(let i=0;i<N*N;i++)im.data.set(fn(i)||[0,0,0,0],i*4);x.putImageData(im,0,0);return c};
+const SARC=cv(i=>{const g=Math.max(0,Math.min(1,(POST[i]+25)/30))*255;return[g,g,g,255]});
+function drawMap(nw,M,qw){const c=$("map"),x=c.getContext("2d"),k=c.width/N;x.imageSmoothingEnabled=false;x.drawImage(SARC,0,0,c.width,c.height);
+ x.drawImage(cv(i=>qw[i]?[50,130,255,150]:null),0,0,c.width,c.height);x.drawImage(cv(i=>nw[i]?[255,70,40,210]:null),0,0,c.width,c.height);
+ M.roads.forEach((r,ri)=>{x.strokeStyle=r.st=="SAFE"?"#2e9e4f":r.st=="FLOOD-AFFECTED"?"#ff3b30":"#f0a020";x.lineWidth=3;x.beginPath();ROADS[ri].p.forEach(([a,b],i)=>i?x.lineTo(a*k,b*k):x.moveTo(a*k,b*k));x.stroke()});
+ M.sett.forEach(s=>{x.beginPath();x.arc(s.x*k,s.y*k,s.aff?8:5,0,7);x.fillStyle=s.aff?"#ff3b30":"#e8e8e8";x.fill();x.strokeStyle="#000";x.lineWidth=1.5;x.stroke();x.fillStyle="#fff";x.font="13px system-ui";x.strokeText(s.n,s.x*k+10,s.y*k+4);x.fillText(s.n,s.x*k+10,s.y*k+4)})}
+function chart(c,xs,ser,mark,xl){const x=c.getContext("2d"),W=c.width,H=c.height,p=38,ink=C("--ink"),mu=C("--mute"),ln=C("--line");x.clearRect(0,0,W,H);x.font="13px system-ui";
+ const xmin=Math.min(...xs),xmax=Math.max(...xs),ym=Math.max(...ser.flatMap(s=>s.v),1e-9)*1.1,X=v=>p+(v-xmin)/((xmax-xmin)||1)*(W-p-10),Y=v=>H-24-v/ym*(H-40);
+ x.strokeStyle=ln;x.fillStyle=mu;for(let i=0;i<=4;i++){const y=Y(ym*i/4);x.beginPath();x.moveTo(p,y);x.lineTo(W-10,y);x.stroke();x.fillText((ym*i/4).toFixed(ym>20?0:1),2,y+4)}
+ x.fillText(xl,W/2-30,H-4);if(mark!=null){x.setLineDash([5,4]);x.strokeStyle=mu;x.beginPath();x.moveTo(X(mark),6);x.lineTo(X(mark),H-24);x.stroke();x.setLineDash([])}
+ ser.forEach(s=>{x.strokeStyle=C(s.col);x.lineWidth=2.5;x.beginPath();s.v.forEach((v,i)=>i?x.lineTo(X(xs[i]),Y(v)):x.moveTo(X(xs[i]),Y(v)));x.stroke()})}
+/* ---------- live run ---------- */
+const K=24;let P,BASE,ORD,step=0,timer=null,paused=false,prevS=new Set,prevR={},H=[];
+function feed(t,m){const d=document.createElement("div");d.innerHTML=`<i>${t}</i>${m}`;$("feed").prepend(d)}
+function frame(i){const cut=i>=K?1e9:ORD[Math.max(0,Math.floor(ORD.length*i/K)-1)];const m=new Uint8Array(N*N);for(let p=0;p<N*N;p++)m[p]=BASE.nw[p]&&DIFF[p]<=cut?1:0;
+ const M=metrics(m),t="T+"+String(i).padStart(2,"0");
+ M.sett.forEach(s=>{if(s.aff&&!prevS.has(s.n)){prevS.add(s.n);feed(t,`<b>${s.n}</b> reached 5% buffer flooding`)}});
+ M.roads.forEach(r=>{if(prevR[r.n]!=r.st&&r.st!="SAFE"){feed(t,`<b>${r.n}</b> now ${r.st.toLowerCase()} (${r.pc.toFixed(0)}%)`);}prevR[r.n]=r.st});
+ if(i%6==0&&i)feed(t,`Flooded area ${f1(M.area)} km², impact index ${Math.round(M.sc)} (${M.lv})`);
+ const fa=P.M.area||1;H.push([M.area,100*M.sa/M.sett.length,100*M.ra/(P.M.ra||1),M.sc]);
+ drawMap(m,M,BASE.qw);kpis(M);$("pb").style.width=100*i/K+"%";
+ chart($("tl"),H.map((_,j)=>j),[{v:H.map(h=>h[0]/fa*100),col:"--water"},{v:H.map(h=>h[1]),col:"--ok"},{v:H.map(h=>h[2]),col:"--mid"},{v:H.map(h=>h[3]),col:"--flood"}],null,"step");
+ $("lg").innerHTML="Lines: flooded area, settlements affected, roads affected (each as % of final) and impact index";
+ $("st").innerHTML=`<span class="live ${i>=K?"off":""}"></span>${i>=K?"Run complete":"Live: step "+i+" of "+K}`;return M}
+function tick(){if(paused)return;step++;frame(step);if(step>=K){clearInterval(timer);timer=null;final()}}
+function kpis(M){$("kpis").innerHTML=[["Flooded area",f1(M.area)+" km²"],["Settlements affected",M.sa+" / "+M.sett.length],["Roads affected",f1(M.ra)+" km"],["Flooded cropland",f1(M.agF)+" km² ("+M.agP.toFixed(0)+"%)"],["Impact index",Math.round(M.sc)+" / 100 "+M.lv]].map(([a,b])=>`<div class="k"><b>${b}</b><span>${a}</span></div>`).join("")}
+function final(){const M=P.M;
+ $("tS").innerHTML="<tr><th>Settlement</th><th>Status</th><th>Buffer</th></tr>"+[...M.sett].sort((a,b)=>b.e-a.e).map(s=>`<tr><td>${s.n}</td><td>${s.aff?tag("AFFECTED","var(--flood)"):"Not affected"}</td><td>${s.e.toFixed(0)}%</td></tr>`).join("");
+ const sc=s=>s=="SAFE"?"var(--ok)":s=="FLOOD-AFFECTED"?"var(--flood)":"var(--mid)";
+ $("tR").innerHTML="<tr><th>Road</th><th>Status</th><th>Affected</th></tr>"+[...M.roads].sort((a,b)=>b.pc-a.pc).map(r=>`<tr><td>${r.n}</td><td>${tag(r.st,sc(r.st))}</td><td>${r.aff.toFixed(1)} of ${r.len.toFixed(1)} km</td></tr>`).join("");
+ const top=M.sett.filter(s=>s.aff).sort((a,b)=>b.e-a.e).slice(0,3).map(s=>s.n).join(", ")||"none",bad=M.roads.filter(r=>r.st=="FLOOD-AFFECTED").map(r=>r.n).join(", ")||"none";
+ const sv=SENS.w,lo=Math.min(...sv.map(v=>v)),hi=Math.max(...sv);
+ $("recs").innerHTML=[["Exposure",`${M.sa} of ${M.sett.length} settlements intersect the flood (most exposed: ${top}). Assess these first.`],["Roads",`${f1(M.ra)} km of ${f1(M.rk)} km (${(100*M.ra/M.rk).toFixed(0)}%) crosses flooding. Flood-affected routes: ${bad}. Inspect before use.`],["Agriculture",`${f1(M.agF)} km² of ${f1(M.agT)} km² cropland (${M.agP.toFixed(0)}%) is inundated.`],["Confidence",`Across the tested water thresholds the flooded area ranges ${f1(lo)} to ${f1(hi)} km²; the current setting gives ${f1(M.area)} km². A wide spread means results depend strongly on the threshold.`],["Response level",`Impact index ${Math.round(M.sc)}/100 (${M.lv}). Describes the observed event, not a forecast.`]].map(([a,b])=>`<div class="rec"><b>${a}</b>${b}</div>`).join("")}
+let SENS={};
+function sens(wt,ct,mp){const xs=[],a=[],xc=[],b=[];for(let w=-25;w<=-12;w++){xs.push(w);a.push(metrics(pipe(w,ct,mp).nw).area)}
+ for(let c=-8;c<=-1;c++){xc.push(c);b.push(metrics(pipe(wt,c,mp).nw).area)}SENS.w=a;
+ chart($("s1"),xs,[{v:a,col:"--water"}],wt,"water threshold (dB)");chart($("s2"),xc,[{v:b,col:"--flood"}],ct,"change threshold (dB)")}
+function start(){clearInterval(timer);const wt=+$("w").value,ct=+$("c").value,mp=+$("m").value;$("vw").textContent=wt;$("vc").textContent=ct;$("vm").textContent=mp;
+ BASE=pipe(wt,ct,mp);P={M:metrics(BASE.nw)};ORD=[];for(let p=0;p<N*N;p++)if(BASE.nw[p])ORD.push(DIFF[p]);ORD.sort((a,b)=>a-b);
+ step=0;H=[];prevS=new Set;prevR={};paused=false;$("pause").textContent="Pause";$("feed").innerHTML="";
+ if(!ORD.length){$("st").textContent="No flood detected with these thresholds.";drawMap(BASE.nw,P.M,BASE.qw);kpis(P.M);final();return}
+ feed("T+00","Scene loaded: pre-flood water "+f1(metrics(BASE.pw).area)+" km²");timer=setInterval(tick,450)}
+$("go").onclick=start;$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"Resume":"Pause"};
+["w","c","m"].forEach(id=>{$(id).oninput=()=>{$("v"+id).textContent=$(id).value};$(id).onchange=()=>{sens(+$("w").value,+$("c").value,+$("m").value);start()}});
+sens(-18,-3,12);start();
+</script></body></html>

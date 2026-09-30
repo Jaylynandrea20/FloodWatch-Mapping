@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RapidFlood – Demo</title>
+<style>
+:root{--bg:#eef1ec;--panel:#fff;--ink:#0e1f2e;--mute:#5b6b78;--line:#cfd7d2;--water:#2f7fb8;--flood:#e4572e;--ok:#2e8b57;--mid:#d9982b;--acc:#0e1f2e;--acct:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0b1620;--panel:#122333;--ink:#e6eef2;--mute:#8fa3b0;--line:#25394a;--water:#5aa9dc;--flood:#ff7a4d;--ok:#4fbf82;--mid:#e8ac47;--acc:#e6eef2;--acct:#0b1620}}
+:root[data-theme=dark]{--bg:#0b1620;--panel:#122333;--ink:#e6eef2;--mute:#8fa3b0;--line:#25394a;--water:#5aa9dc;--flood:#ff7a4d;--ok:#4fbf82;--mid:#e8ac47;--acc:#e6eef2;--acct:#0b1620}
+*{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 40px}
+h1{font:600 clamp(26px,5vw,38px)/1.1 "Iowan Old Style",Georgia,serif;margin:0 0 4px;letter-spacing:-.01em}
+h2{font:600 19px Georgia,serif;margin:22px 0 8px}
+.sub{color:var(--mute);margin:0 0 12px;max-width:62ch}
+.demo{border-left:4px solid var(--mid);background:var(--panel);padding:8px 12px;margin:10px 0 16px;font-size:13.5px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.k{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.k b{display:block;font:600 24px Georgia,serif}.k span{font-size:12.5px;color:var(--mute)}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+label{font-size:13px;color:var(--mute);display:block}label b{color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--water)}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin:18px 0 12px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:8px 12px;font:inherit;cursor:pointer}
+nav button[aria-selected=true]{color:var(--ink);border-color:var(--flood);font-weight:600}
+button:focus-visible,input:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.btn{background:var(--acc);color:var(--acct);border:0;border-radius:5px;padding:7px 14px;font:inherit;cursor:pointer}
+canvas{width:100%;image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;background:#000;display:block}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+figcaption{font-size:12.5px;color:var(--mute);margin-top:4px}figure{margin:0}
+.layers{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 8px;font-size:13px}.layers label{color:var(--ink);display:inline-flex;gap:5px;align-items:center}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tag{padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;font-weight:600}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:3px 0 10px}.bar i{display:block;height:100%;background:var(--flood)}
+.zone{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-top:8px;font-size:14px}
+.rec{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px}.rec b{display:block}
+</style></head><body><main>
+<h1>RapidFlood</h1>
+<p class="sub">Sentinel-1 flood detection, impact and decision support. This page runs the full pipeline in your browser on a fixed synthetic scene.</p>
+<div class="demo"><b>Demo data.</b> The satellite scene is synthetic (fixed seed 42), not real imagery. Live Sentinel-1 analysis needs the Streamlit app with Earth Engine.</div>
+<div class="ctl">
+<label>Water threshold <b id="vw"></b> dB<input id="w" type="range" min="-25" max="-12" step=".5" value="-18"></label>
+<label>Change threshold <b id="vc"></b> dB<input id="c" type="range" min="-8" max="-1" step=".5" value="-3"></label>
+<label>Min region size <b id="vm"></b> px<input id="m" type="range" min="1" max="60" step="1" value="12"></label>
+</div>
+<div class="kpis" id="kpis"></div>
+<nav role="tablist" id="tabs"></nav>
+<section id="v-map"><div class="layers" id="layers"></div><canvas id="map" width="640" height="640" aria-label="Flood map; click for zone statistics"></canvas>
+<div class="zone" id="zone">Click the map for zone statistics around that point.</div></section>
+<section id="v-det" hidden><div class="grid4" id="four"></div><p class="sub" id="method"></p></section>
+<section id="v-rep" hidden><h2>Before / after</h2><canvas id="swipe" width="160" height="160"></canvas>
+<label>Before ◀ ▶ After<input id="cut" type="range" min="0" max="100" value="50"></label>
+<h2>Flood progression</h2><canvas id="prog" width="160" height="160"></canvas><p><button class="btn" id="play">Play progression</button> <span id="plab" class="sub"></span></p>
+<p class="sub">Only two SAR dates exist, so this reveals flooded pixels strongest-change first. It is a visual progression, not a measured time series.</p></section>
+<section id="v-imp" hidden><div class="two"><div><h2>Impact index</h2><div id="idx"></div></div><div><h2>Agriculture</h2><div id="ag"></div></div></div>
+<h2>Settlements</h2><div class="wrap"><table id="tS"></table></div><h2>Roads</h2><div class="wrap"><table id="tR"></table></div></section>
+<section id="v-dec" hidden><p class="sub">Recommendations derived from the satellite results. They are not official emergency instructions.</p><div id="recs"></div></section>
+</main>
+<script>
+const N=160,WK=39.8,HK=38.7,PXA=WK*HK/(N*N),KM=WK/N,$=id=>document.getElementById(id);
+/* ---------- synthetic scene (seed 42) ---------- */
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=rng(42),gs=()=>{let u=0;for(let i=0;i<6;i++)u+=R();return(u-3)/.7071};
+function blur(a,r){const t=new Float32Array(N*N),o=new Float32Array(N*N),d=2*r+1;
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){let s=0;for(let k=-r;k<=r;k++)s+=a[y*N+Math.min(N-1,Math.max(0,x+k))];t[y*N+x]=s/d}
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){let s=0;for(let k=-r;k<=r;k++)s+=t[Math.min(N-1,Math.max(0,y+k))*N+x];o[y*N+x]=s/d}return o}
+function norm(a){let m=0,v=0;a.forEach(x=>m+=x);m/=a.length;a.forEach(x=>v+=(x-m)**2);const s=Math.sqrt(v/a.length)||1;return a.map(x=>(x-m)/s)}
+const noise=()=>Float32Array.from({length:N*N},gs),cx=y=>N*(.5+.12*Math.sin(3*Math.PI*y/N));
+const sm=norm(blur(noise(),7)),tex=norm(blur(noise(),2)),agn=norm(blur(noise(),5));
+const preW=new Uint8Array(N*N),postW=new Uint8Array(N*N),ag=new Uint8Array(N*N),pre0=new Float32Array(N*N),post0=new Float32Array(N*N);
+for(let y=0;y<N;y++)for(let x=0;x<N;x++){const i=y*N+x,dist=Math.abs(x-cx(y)),el=dist/(N/2)+.1*sm[i];
+ const pw=dist<3||(((x-.8*N)/10)**2+((y-.2*N)/6)**2<1);preW[i]=pw;const qw=pw||el<.22;
+ pre0[i]=(pw?-21+.8*tex[i]:-8.5+1.2*tex[i])+gs()*1.6;post0[i]=(qw?-21+.8*tex[i]:-8.5+1.2*tex[i])+gs()*1.6;
+ ag[i]=(dist>6&&el<.9&&agn[i]>-.02)?1:0}
+const PRE=blur(pre0,2),POST=blur(post0,2);
+const SET=[["Dhalpur",.20,-10],["Majgaon",.35,12],["Kharupetia",.50,-20],["Bhogpur",.62,7],["Rangatoli",.78,-15],["Tezghat",.88,27],["Uttar Sila",.12,40],["Hill Haat",.45,50],["Dakshin Pam",.95,-46]].map(([n,fy,dx])=>({n,y:fy*N,x:Math.min(N-3,Math.max(2,cx(fy*N)+dx))}));
+const lin=(f,k=25)=>Array.from({length:k},(_,i)=>f(i/(k-1)*(N-1)));
+const ROADS=[["NH-37 (E-W)",lin(t=>[t,.5*N+4*Math.sin(t/20)])],["SH-1 (east)",lin(t=>[Math.min(N-2,cx(t)+30),t])],["West Bank Rd",lin(t=>[cx(t)-12,t])],["Link Rd (south)",lin(t=>[t,.85*N+3*Math.sin(t/15)])],["Hill Rd",lin(t=>[Math.min(N-2,cx(t)+57),t])],["Ghat Rd",lin(t=>[.15*N+(cx(.4*N)-.15*N)*t/(N-1),.1*N+.3*N*t/(N-1)])]].map(([n,p])=>({n,p}));
+/* ---------- pipeline ---------- */
+function removeSmall(m,minpx){const lab=new Int32Array(N*N),o=new Uint8Array(N*N);let st=[];
+ for(let s=0;s<N*N;s++){if(!m[s]||lab[s])continue;const comp=[s];lab[s]=1;st=[s];
+  while(st.length){const p=st.pop(),x=p%N,y=(p/N)|0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const q=ny*N+nx;if(m[q]&&!lab[q]){lab[q]=1;comp.push(q);st.push(q)}}}
+  if(comp.length>=minpx)comp.forEach(q=>o[q]=1)}return o}
+function score(ff,agf,ns){return 100*(.5*Math.min(ff/.5,1)+.3*agf+.2*Math.min(ns,1))}
+const lvl=s=>s<34?"LOW":s<67?"MEDIUM":"HIGH",COL={LOW:"var(--ok)",MEDIUM:"var(--mid)",HIGH:"var(--flood)",NONE:"var(--mute)"};
+let S={};
+function run(){const wt=+$("w").value,ct=+$("c").value,mp=+$("m").value;
+ $("vw").textContent=wt;$("vc").textContent=ct;$("vm").textContent=mp;
+ const pw=removeSmall(PRE.map(v=>v<wt?1:0),mp),qw=removeSmall(POST.map(v=>v<wt?1:0),mp),nw=new Uint8Array(N*N),diff=new Float32Array(N*N);
+ for(let i=0;i<N*N;i++){diff[i]=POST[i]-PRE[i];nw[i]=(qw[i]&&!pw[i]&&diff[i]<ct)?1:0}
+ const nw2=removeSmall(nw,mp),cnt=a=>a.reduce((s,v)=>s+v,0),pre=cnt(pw)*PXA,post=cnt(qw)*PXA,nf=cnt(nw2)*PXA;
+ let agT=0,agF=0;for(let i=0;i<N*N;i++){if(ag[i]){agT++;if(nw2[i])agF++}}
+ const sett=SET.map(s=>{let f=0,t=0;for(let y=Math.floor(s.y-4);y<=s.y+4;y++)for(let x=Math.floor(s.x-4);x<=s.x+4;x++){if(x<0||y<0||x>=N||y>=N||(x-s.x)**2+(y-s.y)**2>13)continue;t++;f+=nw2[y*N+x]}
+  const e=t?100*f/t:0;return{...s,e,aff:e>=5}});
+ const roads=ROADS.map(r=>{let L=0,A=0;for(let i=1;i<r.p.length;i++){const[a,b]=[r.p[i-1],r.p[i]],len=Math.hypot(b[0]-a[0],b[1]-a[1]);L+=len;
+  const mx=Math.round((a[0]+b[0])/2),my=Math.round((a[1]+b[1])/2);if(nw2[Math.min(N-1,my)*N+Math.min(N-1,mx)])A+=len}
+  const pc=100*A/L;return{n:r.n,len:L*KM,aff:A*KM,pc,st:pc<1?"SAFE":pc<40?"PARTIALLY AFFECTED":"FLOOD-AFFECTED"}});
+ const rk=roads.reduce((s,r)=>s+r.len,0),ra=roads.reduce((s,r)=>s+r.aff,0),sa=sett.filter(s=>s.aff).length;
+ const comps={"Flood extent":Math.min(nf/(WK*HK)*100/30,1)*100,"Settlement exposure":100*sa/sett.length,"Road exposure":Math.min(100*ra/rk/50,1)*100,"Agriculture impact":Math.min(100*(agF/agT)/50,1)*100};
+ const sc=Object.values(comps).reduce((s,v)=>s+v,0)/4;
+ S={pw,qw,nw:nw2,diff,pre,post,nf,exp:pre>0?(post-pre)/pre*100:NaN,sett,roads,rk,ra,sa,ag:{t:agT*PXA,f:agF*PXA,p:100*agF/Math.max(agT,1)},comps,sc,lv:lvl(sc),wt,ct,mp};
+ render()}
+/* ---------- drawing ---------- */
+const cv=(fn)=>{const c=document.createElement("canvas");c.width=c.height=N;const x=c.getContext("2d"),im=x.createImageData(N,N);for(let i=0;i<N*N;i++){const v=fn(i)||[0,0,0,0];im.data.set(v,i*4)}x.putImageData(im,0,0);return c};
+const gray=a=>i=>{const g=Math.max(0,Math.min(1,(a[i]+25)/30))*255;return[g,g,g,255]};
+const mask=(m,c,al=200)=>i=>m[i]?[...c,al]:null;
+function draw(c,src){const x=c.getContext("2d");x.imageSmoothingEnabled=false;x.clearRect(0,0,c.width,c.height);x.drawImage(src,0,0,c.width,c.height)}
+const L={"Post-flood SAR":1,"Pre-flood SAR":0,"Post-flood water":0,"Newly flooded":1,"Agriculture":0,"Settlements":1,"Roads":1,"Impact grid":0};
+function drawMap(){const c=$("map"),x=c.getContext("2d"),k=c.width/N;x.imageSmoothingEnabled=false;x.fillStyle="#000";x.fillRect(0,0,c.width,c.height);
+ const lay=(cnv)=>x.drawImage(cnv,0,0,c.width,c.height);
+ if(L["Pre-flood SAR"])lay(cv(gray(PRE)));else if(L["Post-flood SAR"])lay(cv(gray(POST)));
+ if(L["Agriculture"])lay(cv(i=>ag[i]?(S.nw[i]?[255,140,0,200]:[60,180,60,90]):null));
+ if(L["Post-flood water"])lay(cv(mask(S.qw,[50,130,255],170)));
+ if(L["Newly flooded"])lay(cv(mask(S.nw,[255,70,40],190)));
+ if(L["Impact grid"]){const b=24;for(let i=0;i<N;i+=b)for(let j=0;j<N;j+=b){let f=0;for(let y=i;y<Math.min(N,i+b);y++)for(let xx=j;xx<Math.min(N,j+b);xx++)f+=S.nw[y*N+xx];if(!f)continue;
+  const lv=lvl(score(f/(b*b),0,0)*1.4);x.fillStyle=lv=="HIGH"?"rgba(215,38,61,.35)":lv=="MEDIUM"?"rgba(240,160,32,.35)":"rgba(46,158,79,.3)";x.fillRect(j*k,i*k,b*k,b*k)}}
+ if(L["Roads"])S.roads.forEach((r,ri)=>{x.strokeStyle=r.st=="SAFE"?"#2e9e4f":r.st=="FLOOD-AFFECTED"?"#ff3b30":"#f0a020";x.lineWidth=3;x.beginPath();ROADS[ri].p.forEach(([a,b],i)=>i?x.lineTo(a*k,b*k):x.moveTo(a*k,b*k));x.stroke()});
+ if(L["Settlements"])S.sett.forEach(s=>{x.beginPath();x.arc(s.x*k,s.y*k,s.aff?8:5,0,7);x.fillStyle=s.aff?"#ff3b30":"#e8e8e8";x.fill();x.strokeStyle="#000";x.lineWidth=1.5;x.stroke();x.fillStyle="#fff";x.font="12px system-ui";x.strokeText(s.n,s.x*k+10,s.y*k+4);x.fillText(s.n,s.x*k+10,s.y*k+4)});
+ if(S.zone){x.strokeStyle="#fff";x.lineWidth=2;x.strokeRect((S.zone.j-8)*k,(S.zone.i-8)*k,17*k,17*k)}}
+const tag=(t,c)=>`<span class="tag" style="background:${c}">${t}</span>`,f1=v=>v!=v?"n/a":v.toFixed(1);
+function render(){
+ $("kpis").innerHTML=[["Flooded area",f1(S.nf)+" km²"],["Water expansion",S.exp!=S.exp?"n/a":f1(S.exp)+"%"],["Settlements affected",S.sa+" / "+S.sett.length],["Roads affected",f1(S.ra)+" km"],["Impact index",Math.round(S.sc)+" / 100 "+S.lv]].map(([a,b])=>`<div class="k"><b>${b}</b><span>${a}</span></div>`).join("");
+ drawMap();
+ const four=[["Before: pre-flood SAR (dB)",cv(gray(PRE))],["After: post-flood SAR (dB)",cv(gray(POST))],["Change (red = darker after)",cv(i=>{const d=S.diff[i];return d<0?[255,255-Math.min(1,-d/8)*230,255-Math.min(1,-d/8)*230,255]:[255-Math.min(1,d/8)*200,255-Math.min(1,d/8)*150,255,255]})],["Detected flood extent",(()=>{const c=cv(gray(POST)),x=c.getContext("2d");x.drawImage(cv(mask(S.nw,[255,50,40],210)),0,0);return c})()]];
+ $("four").innerHTML="";four.forEach(([t,src])=>{const f=document.createElement("figure"),c=document.createElement("canvas");c.width=c.height=N;draw(c,src);f.append(c);f.insertAdjacentHTML("beforeend",`<figcaption>${t}</figcaption>`);$("four").append(f)});
+ $("method").innerHTML=`A pixel is flooded when post-flood backscatter is below <b>${S.wt} dB</b>, it was not water before, and it dropped by more than <b>${Math.abs(S.ct)} dB</b>. Regions under ${S.mp} px are removed. Dark but unchanged pixels are not flagged. Pre-flood water ${f1(S.pre)} km², post-flood water ${f1(S.post)} km².`;
+ swipe();prog(5);
+ $("idx").innerHTML=`<p style="font:600 30px Georgia,serif;margin:0">${Math.round(S.sc)} / 100 ${tag(S.lv,COL[S.lv])}</p>`+Object.entries(S.comps).map(([k,v])=>`<div>${k}: ${Math.round(v)}%</div><div class="bar"><i style="width:${v}%"></i></div>`).join("")+`<p class="sub">Describes the observed event. It is not a forecast.</p>`;
+ $("ag").innerHTML=`<p>Cropland in area: <b>${f1(S.ag.t)} km²</b><br>Flooded cropland: <b>${f1(S.ag.f)} km²</b> (${f1(S.ag.p)}%)</p>`;
+ $("tS").innerHTML="<tr><th>Name</th><th>Status</th><th>Buffer flooded</th></tr>"+[...S.sett].sort((a,b)=>b.e-a.e).map(s=>`<tr><td>${s.n}</td><td>${s.aff?tag("AFFECTED","var(--flood)"):"Not affected"}</td><td>${s.e.toFixed(0)}%</td></tr>`).join("");
+ const sc=st=>st=="SAFE"?"var(--ok)":st=="FLOOD-AFFECTED"?"var(--flood)":"var(--mid)";
+ $("tR").innerHTML="<tr><th>Road</th><th>Status</th><th>Length</th><th>Affected</th><th>Share</th></tr>"+[...S.roads].sort((a,b)=>b.pc-a.pc).map(r=>`<tr><td>${r.n}</td><td>${tag(r.st,sc(r.st))}</td><td>${r.len.toFixed(1)} km</td><td>${r.aff.toFixed(1)} km</td><td>${r.pc.toFixed(0)}%</td></tr>`).join("");
+ const top=S.sett.filter(s=>s.aff).sort((a,b)=>b.e-a.e).slice(0,3).map(s=>s.n).join(", ")||"none",bad=S.roads.filter(r=>r.st=="FLOOD-AFFECTED").map(r=>r.n).join(", ")||"none";
+ $("recs").innerHTML=[["High priority",`${S.sa} of ${S.sett.length} settlements intersect the flood extent (most exposed: ${top}). Assess these first.`],["Road attention",`${f1(S.ra)} km of ${f1(S.rk)} km mapped roads (${(100*S.ra/S.rk).toFixed(0)}%) cross detected flooding. Flood-affected routes: ${bad}. Inspect before use.`],["Agricultural assessment",`${f1(S.ag.f)} km² of cropland (${S.ag.p.toFixed(0)}%) shows inundation. Start field damage checks where flooded cropland is largest.`],["Response zones",`Impact index ${Math.round(S.sc)}/100 (${S.lv}). Turn on Impact grid on the map to see priority blocks.`]].map(([a,b])=>`<div class="rec"><b>${a}</b>${b}</div>`).join("")}
+function swipe(){const c=$("swipe"),x=c.getContext("2d"),k=Math.round(N*$("cut").value/100);x.drawImage(cv(gray(POST)),0,0);x.drawImage(cv(gray(PRE)),0,0,k,N,0,0,k,N);x.fillStyle="#fff";x.fillRect(Math.max(k-1,0),0,2,N)}
+function prog(i){const v=[];for(let p=0;p<N*N;p++)if(S.nw[p])v.push(S.diff[p]);v.sort((a,b)=>a-b);const cut=i==0||!v.length?-99:v[Math.min(v.length-1,Math.floor(v.length*i/5))];
+ const m=new Uint8Array(N*N);let n=0;for(let p=0;p<N*N;p++)if(S.nw[p]&&S.diff[p]<=cut){m[p]=1;n++}
+ const c=cv(gray(POST));c.getContext("2d").drawImage(cv(mask(m,[255,50,40],210)),0,0);$("prog").getContext("2d").drawImage(c,0,0);
+ $("plab").textContent=["Before flood","Early","Rising","Rising","Late","Peak"][i]+": "+(n*PXA).toFixed(1)+" km² flooded"}
+/* ---------- UI ---------- */
+const TABS=[["map","Flood map"],["det","Detection"],["rep","Replay"],["imp","Impact"],["dec","Decision support"]];
+$("tabs").innerHTML=TABS.map(([id,t],i)=>`<button role="tab" data-t="${id}" aria-selected="${!i}">${t}</button>`).join("");
+$("tabs").onclick=e=>{const t=e.target.dataset.t;if(!t)return;document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.t==t));TABS.forEach(([id])=>$("v-"+id).hidden=id!=t)};
+$("layers").innerHTML=Object.keys(L).map(k=>`<label><input type="checkbox" data-l="${k}" ${L[k]?"checked":""}>${k}</label>`).join("");
+$("layers").onchange=e=>{const k=e.target.dataset.l;L[k]=e.target.checked?1:0;if(k=="Pre-flood SAR"&&L[k])L["Post-flood SAR"]=0;if(k=="Post-flood SAR"&&L[k])L["Pre-flood SAR"]=0;document.querySelectorAll("#layers input").forEach(i=>i.checked=!!L[i.dataset.l]);drawMap()};
+$("map").onclick=e=>{const r=e.target.getBoundingClientRect(),j=Math.floor((e.clientX-r.left)/r.width*N),i=Math.floor((e.clientY-r.top)/r.height*N),rr=8;
+ let f=0,a=0,at=0;for(let y=Math.max(0,i-rr);y<=Math.min(N-1,i+rr);y++)for(let x=Math.max(0,j-rr);x<=Math.min(N-1,j+rr);x++){const p=y*N+x;f+=S.nw[p];if(ag[p]){at++;a+=S.nw[p]}}
+ const ns=S.sett.filter(s=>s.aff&&Math.abs(s.x-j)<=rr&&Math.abs(s.y-i)<=rr).length,tot=(Math.min(N-1,i+rr)-Math.max(0,i-rr)+1)*(Math.min(N-1,j+rr)-Math.max(0,j-rr)+1),sc=score(f/tot,a/Math.max(at,1),ns),lv=f?lvl(sc):"NONE";
+ S.zone={i,j};$("zone").innerHTML=`<b>Zone analysis</b> ${tag(lv,COL[lv])} flooded ${(f*PXA).toFixed(2)} km² · affected settlements ${ns} · flooded cropland ${(a*PXA).toFixed(2)} km² · window about ${(17*KM).toFixed(1)} km wide`;drawMap()};
+["w","c","m"].forEach(id=>$(id).oninput=run);$("cut").oninput=swipe;
+$("play").onclick=()=>{let i=0;const t=setInterval(()=>{prog(i++);if(i>5)clearInterval(t)},700)};
+run();
+</script></body></html>
